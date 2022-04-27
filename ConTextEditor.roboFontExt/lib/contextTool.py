@@ -15,6 +15,7 @@ class ContextEditTool(BaseEventTool):
         return "ConText Editor"
 
     def becomeActive(self):
+        print("activate")
         self.contextSubscriber = toggleSubscriberClassOn(ContextDisplaySubscriber, registerGlyphEditorSubscriber)
         for c in getActiveSubscriberByClass(ContextDisplaySubscriber):
             print(c.getGlyphEditor())

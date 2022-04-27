@@ -5,6 +5,8 @@ from mojo.roboFont import CurrentGlyph, CurrentFont, AllFonts, RGlyph
 import merz
 import vanilla
 
+import pathlib
+
 # ----------------------------------------
 
 CURRENT_FONT_MENU_NAME = "CurrentFont"
@@ -184,7 +186,7 @@ class ContextGlyph(BaseContextEditorBox):
     def __init__(self, name="n", font=None, parent=None, offset=0):
         super().__init__(parent=parent)
         self._name = name
-        self._font = font
+        self._set_font(font)
 
         self._x = 0
         self._y = self.current_font.info.descender
@@ -197,7 +199,15 @@ class ContextGlyph(BaseContextEditorBox):
     # ----------------------------------------
     
     def as_dict(self):
-        return {"name": self._name, "font": self._font}
+        return {"name": self._name, "font": _get_font_string(self._font)}
+
+    def _relative_font_path(self):
+        if self.font:
+            font_path = pathlib.Path(self.font.path)
+            root_font_path = pathlib.Path(self.parent.font.path)
+            return font_path.relative_to(root_font_path)
+        else:
+            return None
 
     # ----------------------------------------
     @property
@@ -225,7 +235,7 @@ class ContextGlyph(BaseContextEditorBox):
     def name(self, value):
         self._name = value
         self._glyph_changed()
-        self.parent.save_data_to_global()
+        # self.parent.save_data_to_global()
         
     @property
     def font(self):
@@ -233,10 +243,19 @@ class ContextGlyph(BaseContextEditorBox):
 
     @font.setter
     def font(self, value):
-        self._font = value
+        self._set_font(value)
         self._glyph_changed()
-        self.parent.save_data_to_global()
+        # self.parent.save_data_to_global()
 
+    def _set_font(self, value):
+        if isinstance(value, str):
+            self._font = None
+            for f in AllFonts():
+                if _get_font_string(f) == value:
+                    self._font = value
+                    break
+        else:
+            self._font = value
 
     @property
     def glyph(self):
@@ -496,14 +515,18 @@ class LeftContextAddButton(ContextAddButton):
 
 # ----------------------------------------
 
-
+BASE_LIB_KEY = "com.mathieureguer.ConTextEditor"
+RIGHT_CONTEXT_LIB_KEY = BASE_LIB_KEY + ".right_context"
+MASK_CONTEXT_LIB_KEY = BASE_LIB_KEY + ".mask_context"
+LEFT_CONTEXT_LIB_KEY = BASE_LIB_KEY + ".left_context"
 
 class ContextDisplaySubscriber(Subscriber):
-    global_left_context = [DEFAULT_CONTEXT_DICT]
-    global_mask_context = [DEFAULT_CONTEXT_DICT]
-    global_right_context = [DEFAULT_CONTEXT_DICT]
+    # global_left_context = [DEFAULT_CONTEXT_DICT]
+    # global_mask_context = [DEFAULT_CONTEXT_DICT]
+    # global_right_context = [DEFAULT_CONTEXT_DICT]
 
     def build(self):
+        print("build")
         self._edit_mode = False
         self.left_add_button = LeftContextAddButton(self)
         self.right_add_button = RightContextAddButton(self)
@@ -523,42 +546,70 @@ class ContextDisplaySubscriber(Subscriber):
         self.position_context()
 
     def destroy(self):
-        # ContextDisplaySubscriber.global_left_context = [c.as_dict() for c in self.left_context]
-        # ContextDisplaySubscriber.global_mask_context = [c.as_dict() for c in self.mask_context]
-        # ContextDisplaySubscriber.global_right_context = [c.as_dict() for c in self.right_context]
-        # print("destroy", global_left_context)
+        self.save_context_to_font_lib()
         self.clear_context()
 
     # ----------------------------------------
+    ## this is used for persistent context shared accross all subscribers
     
-    def populate_right_context_from_global(self):
+    # def populate_right_context_from_global(self):
+    #     self.right_context = []
+    #     for glyph_data in ContextDisplaySubscriber.global_right_context:
+    #         self._add_glyph_box_to_right_context(glyph_data)
+
+    # def populate_left_context_from_global(self):
+    #     self.left_context = []
+    #     for glyph_data in ContextDisplaySubscriber.global_left_context:
+    #         self._add_glyph_box_to_left_context(glyph_data)
+
+    # def populate_mask_context_from_global(self):
+    #     self.mask_context = []
+    #     for glyph_data in ContextDisplaySubscriber.global_mask_context:
+    #         self._add_glyph_box_to_mask_context(glyph_data)
+
+    # def save_data_to_global(self):
+    #     """
+    #     This is probably overly complex, should be an event
+    #     """
+    #     ContextDisplaySubscriber.global_left_context = [c.as_dict() for c in self.left_context]
+    #     ContextDisplaySubscriber.global_mask_context = [c.as_dict() for c in self.mask_context]
+    #     ContextDisplaySubscriber.global_right_context = [c.as_dict() for c in self.right_context]
+
+    #     for s in getActiveSubscriberByClass(ContextDisplaySubscriber):
+    #         s.build_context()
+    #         s.position_context()
+
+    # ----------------------------------------
+    
+    def save_context_to_font_lib(self):
+        self.font.lib[RIGHT_CONTEXT_LIB_KEY] = [context.as_dict() for context in self.right_context]
+        self.font.lib[MASK_CONTEXT_LIB_KEY] = [context.as_dict() for context in self.mask_context]
+        self.font.lib[LEFT_CONTEXT_LIB_KEY] = [context.as_dict() for context in self.left_context]
+
+    def populate_context_from_lib(self):
+
         self.right_context = []
-        for glyph_data in ContextDisplaySubscriber.global_right_context:
-            self._add_glyph_box_to_right_context(glyph_data)
+        if RIGHT_CONTEXT_LIB_KEY in self.font.lib:
+            for glyph_data in self.font.lib[RIGHT_CONTEXT_LIB_KEY]:
+                self._add_glyph_box_to_right_context(glyph_data)
+        else:
+            self._add_glyph_box_to_right_context({"name": "n", "font":None})
 
-    def populate_left_context_from_global(self):
-        self.left_context = []
-        for glyph_data in ContextDisplaySubscriber.global_left_context:
-            self._add_glyph_box_to_left_context(glyph_data)
-
-    def populate_mask_context_from_global(self):
         self.mask_context = []
-        for glyph_data in ContextDisplaySubscriber.global_mask_context:
-            self._add_glyph_box_to_mask_context(glyph_data)
+        if MASK_CONTEXT_LIB_KEY in self.font.lib:
+            for glyph_data in self.font.lib[MASK_CONTEXT_LIB_KEY]:
+                self._add_glyph_box_to_mask_context(glyph_data)
+        else:
+            self._add_glyph_box_to_mask_context({"name": "n", "font":None})
 
-    def save_data_to_global(self):
-        """
-        This is probably overly complex, should be an event
-        """
-        ContextDisplaySubscriber.global_left_context = [c.as_dict() for c in self.left_context]
-        ContextDisplaySubscriber.global_mask_context = [c.as_dict() for c in self.mask_context]
-        ContextDisplaySubscriber.global_right_context = [c.as_dict() for c in self.right_context]
+        self.left_context = []
+        if MASK_CONTEXT_LIB_KEY in self.font.lib:
+            for glyph_data in self.font.lib[LEFT_CONTEXT_LIB_KEY]:
+                self._add_glyph_box_to_left_context(glyph_data)
+        else:
+            self._add_glyph_box_to_left_context({"name": "n", "font":None})
 
-        for s in getActiveSubscriberByClass(ContextDisplaySubscriber):
-            s.build_context()
-            s.position_context()
 
-    
     # ----------------------------------------
     
     @property
@@ -627,19 +678,11 @@ class ContextDisplaySubscriber(Subscriber):
     # ----------------------------------------
 
     def build_context(self):
+        print("build context")
         self.clear_context()
-        # if len(self.left_context) == 0:
-        #     self._add_glyph_box_to_left_context("n")
-        # if len(self.mask_context) == 0:
-        #     self._add_glyph_box_to_mask_context("n") 
-        # if len(self.right_context) == 0:
-        #     self._add_glyph_box_to_right_context("n")
-        self.populate_left_context_from_global()
-        self.populate_mask_context_from_global()
-        self.populate_right_context_from_global()
+        self.populate_context_from_lib()
 
         for box in self.left_context:
-            # box.build_merz_layers()
             self.container_background.appendSublayer(box.background_layer)
             self.container_preview.appendSublayer(box.preview_layer)
 
@@ -664,7 +707,7 @@ class ContextDisplaySubscriber(Subscriber):
             box.offset = current_offset
 
     def position_right_context(self):
-        current_offset = self.glyphs.width
+        current_offset = self.glyph.width
         for box in [*self.right_context, self.right_add_button]:
             box.offset = current_offset
             current_offset += box.width
@@ -682,13 +725,11 @@ class ContextDisplaySubscriber(Subscriber):
 
     def new_glyph_to_right_context(self):
         box = self.add_glyph_to_right_context(DEFAULT_CONTEXT_DICT)
-        # self.save_data_to_global()
         box.name = "n"
         box.selected = True
 
     def new_glyph_to_left_context(self):
         box = self.add_glyph_to_left_context(DEFAULT_CONTEXT_DICT)
-        # self.save_data_to_global()
         box.name = "n"
         box.selected = True
     
