@@ -72,7 +72,6 @@ def toggleSubscriberClassOff(SubscriberClass, unregister_function):
 
 def getActiveSubscriberByClass(SubscriberClass):
     registered_subscribers = listRegisteredSubscribers(subscriberClassName=SubscriberClass.__name__)
-    print("**** registered", registered_subscribers)
     return (registered_subscribers)
 
 
@@ -252,7 +251,7 @@ class ContextGlyph(BaseContextEditorBox):
             self._font = None
             for f in AllFonts():
                 if _get_font_string(f) == value:
-                    self._font = value
+                    self._font = f
                     break
         else:
             self._font = value
@@ -526,7 +525,6 @@ class ContextDisplaySubscriber(Subscriber):
     # global_right_context = [DEFAULT_CONTEXT_DICT]
 
     def build(self):
-        print("build")
         self._edit_mode = False
         self.left_add_button = LeftContextAddButton(self)
         self.right_add_button = RightContextAddButton(self)
@@ -609,6 +607,17 @@ class ContextDisplaySubscriber(Subscriber):
         else:
             self._add_glyph_box_to_left_context({"name": "n", "font":None})
 
+    # ----------------------------------------
+    
+    def delete_selected_box(self):
+        for context in [self.left_context, self.right_context]:
+            for i, box in enumerate(context):
+                if box.selected:
+                    del context[i]
+        self.save_context_to_font_lib()
+        self.build_context()
+        self.position_context()
+
 
     # ----------------------------------------
     
@@ -665,6 +674,12 @@ class ContextDisplaySubscriber(Subscriber):
                 else:
                     box.selected = False
 
+    def glyphEditorDidKeyDown(self, info):
+        if self.edit_mode:
+            DELETE_KEY = '\x7f'
+            if info["deviceState"]["keyDown"]== DELETE_KEY:
+                self.delete_selected_box()
+
     glyphEditorGlyphDidChangeDelay = 0
     def glyphEditorGlyphDidChange(self, info):
         for box in [*self.left_context, *self.mask_context, *self.right_context]:
@@ -678,7 +693,6 @@ class ContextDisplaySubscriber(Subscriber):
     # ----------------------------------------
 
     def build_context(self):
-        print("build context")
         self.clear_context()
         self.populate_context_from_lib()
 

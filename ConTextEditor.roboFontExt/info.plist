@@ -18,7 +18,7 @@
     <key>developerURL</key>
     <string>www.mathieureguer.com</string>
     <key>html</key>
-    <false/>
+    <true/>
     <key>launchAtStartUp</key>
     <integer>1</integer>
     <key>mainScript</key>
