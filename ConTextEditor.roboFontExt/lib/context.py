@@ -297,7 +297,6 @@ class ContextGlyph(BaseContextEditorBox):
         
         name = self.name
         target_layer = self.target_layer
-
         if len(name) > 0 and name in font:
             glyph = font[name]
             if target_layer in font.layerOrder:
@@ -338,7 +337,7 @@ class ContextGlyph(BaseContextEditorBox):
     def _glyph_editor_will_set_glyph(self):
         # reset the querry to get up to date dynamic name
         self._set_querry(self.querry)
-        self._current_glyph_changed()
+        self._glyph_changed()
 
     def _update_glyph_path(self):
         p = self.glyph.getRepresentation("merz.CGPath")
@@ -634,7 +633,6 @@ class ContextDisplaySubscriber(Subscriber):
     def _validate_data_with_default(self, data):
         validated_data = DEFAULT_CONTEXT_DICT.copy()
         mutual_keys = data.keys() & DEFAULT_CONTEXT_DICT.keys()
-        print("mutual", mutual_keys)
         for k in mutual_keys:
             validated_data[k] = data[k]
         return validated_data
@@ -709,7 +707,7 @@ class ContextDisplaySubscriber(Subscriber):
     
     def glyphEditorWillSetGlyph(self, info):
         for box in [*self.left_context, *self.mask_context, *self.right_context]:
-                box._font_glyph_changed()
+                # box._font_glyph_changed()
                 box._glyph_editor_will_set_glyph()
                 # box._current_glyph_changed()
         self.position_context()
@@ -743,6 +741,7 @@ class ContextDisplaySubscriber(Subscriber):
     def glyphEditorGlyphDidChange(self, info):
         for box in [*self.left_context, *self.mask_context, *self.right_context]:
             box._current_glyph_changed()
+            # box._glyph_editor_will_set_glyph()
 
     glyphEditorGlyphDidChangeMetricsDelay = 0
     def glyphEditorGlyphDidChangeMetrics(self, info):
