@@ -11,8 +11,9 @@ import pathlib
 
 CURRENT_FONT_MENU_NAME = "CurrentFont"
 CURRENT_GLYPH_TAG = "<self>"
+LAYER_NAME_TOKEN = "@"
 
-DEFAULT_CONTEXT_DICT = {"name": "n", "font": None}
+DEFAULT_CONTEXT_DICT = {"querry": "n", "font": None}
 
 # ----------------------------------------
 # a set of global variable to keep some peristent data
@@ -182,10 +183,10 @@ class ContextGlyph(BaseContextEditorBox):
 
     # insertion_point_width = 10
 
-    def __init__(self, name="n", font=None, parent=None, offset=0):
+    def __init__(self, querry="n", font=None, parent=None, offset=0):
         super().__init__(parent=parent)
-        self._name = name
         self._set_font(font)
+        self._set_querry(querry)
 
         self._x = 0
         self._y = self.current_font.info.descender
@@ -198,7 +199,7 @@ class ContextGlyph(BaseContextEditorBox):
     # ----------------------------------------
     
     def as_dict(self):
-        return {"name": self._name, "font": _get_font_string(self._font)}
+        return {"querry": self._querry, "font": _get_font_string(self._font)}
 
     def _relative_font_path(self):
         if self.font:
@@ -211,7 +212,7 @@ class ContextGlyph(BaseContextEditorBox):
     # ----------------------------------------
     @property
     def current_font(self):
-        return self.parent.font
+        return self.parent.font.asFontParts()
 
     @property
     def current_glyph(self):
@@ -227,15 +228,48 @@ class ContextGlyph(BaseContextEditorBox):
         return (self.background_layer, self.preview_layer)
 
     @property
+    def querry(self):
+        return self._querry
+
+    @querry.setter
+    def querry(self, value):
+        self._set_querry(value)
+        self._glyph_changed()
+        # self.parent.save_data_to_global()
+
+    def _set_querry(self, value):
+        querry = value.strip()
+        name_querry, target_layer = self._split_name_and_layer(querry)
+        name = self._resolve_name_querry(name_querry)
+        self._querry = querry
+        self._name = name
+        self._target_layer = target_layer
+
+
+    def _resolve_name_querry(self, name_querry):
+        name = name_querry
+        if CURRENT_GLYPH_TAG in name:
+            name = name.replace(CURRENT_GLYPH_TAG, self.current_glyph.name)
+        return name
+
+    def _split_name_and_layer(self, querry):
+        if LAYER_NAME_TOKEN in querry:
+            name, layer = querry.split(LAYER_NAME_TOKEN, 1)
+        else:
+            font = self.font or self.current_font
+            name, layer = querry, font.defaultLayer.name
+        return name, layer
+
+
+    @property
     def name(self):
         return self._name
 
-    @name.setter
-    def name(self, value):
-        self._name = value
-        self._glyph_changed()
-        # self.parent.save_data_to_global()
-        
+    @property
+    def target_layer(self):
+        return self._target_layer
+
+            
     @property
     def font(self):
         return self._font
@@ -256,16 +290,18 @@ class ContextGlyph(BaseContextEditorBox):
         else:
             self._font = value
 
+
     @property
     def glyph(self):
-        if self.name == CURRENT_GLYPH_TAG:
-            name_ = self.current_glyph.name
-        else:
-            name_ = self.name
-
         font = self.font or self.current_font
-        if len(name_) > 0 and name_ in font:
-            glyph = font[name_]
+        
+        name = self.name
+        target_layer = self.target_layer
+
+        if len(name) > 0 and name in font:
+            glyph = font[name]
+            if target_layer in font.layerOrder:
+                glyph = glyph.getLayer(target_layer)
         else:
             glyph = RGlyph()
             glyph.width = 200
@@ -287,12 +323,22 @@ class ContextGlyph(BaseContextEditorBox):
 
 
     def _current_glyph_changed(self):
-        if self.name == CURRENT_GLYPH_TAG or self.name == self.current_glyph.name:
-            self._update_glyph_path()
+        # maybe this should always update everything?
+        # layer can change...
+        # self._update_glyph_path()
+        if self.name == self.current_glyph.name:
+            if self.target_layer == self.current_glyph.layer.name:
+            # Glyph will get redrawn even if they are not on the same layer
+                self._update_glyph_path()
 
     def _font_glyph_changed(self):
         if not self.font:
             self._update_glyph_path()
+
+    def _glyph_editor_will_set_glyph(self):
+        # reset the querry to get up to date dynamic name
+        self._set_querry(self.querry)
+        self._current_glyph_changed()
 
     def _update_glyph_path(self):
         p = self.glyph.getRepresentation("merz.CGPath")
@@ -363,7 +409,7 @@ class ContextGlyphPopover():
 
     def build(self):
         self.panel = vanilla.Popover((120, 80))
-        self.panel.name = vanilla.EditText("auto", self.parent.name, callback=self.name_callback)
+        self.panel.name = vanilla.EditText("auto", self.parent.querry, callback=self.name_callback)
         self.panel.font = vanilla.PopUpButton("auto", self.font_map.keys(), callback=self.font_callback)
 
         rules = [
@@ -377,7 +423,7 @@ class ContextGlyphPopover():
     # ----------------------------------------
     
     def name_callback(self, sender):
-        self.parent.name = sender.get()
+        self.parent.querry = sender.get()
 
     def font_callback(self, sender):
         key = sender.getItem()
@@ -584,28 +630,40 @@ class ContextDisplaySubscriber(Subscriber):
         self.font.lib[MASK_CONTEXT_LIB_KEY] = [context.as_dict() for context in self.mask_context]
         self.font.lib[LEFT_CONTEXT_LIB_KEY] = [context.as_dict() for context in self.left_context]
 
+
+    def _validate_data_with_default(self, data):
+        validated_data = DEFAULT_CONTEXT_DICT.copy()
+        mutual_keys = data.keys() & DEFAULT_CONTEXT_DICT.keys()
+        print("mutual", mutual_keys)
+        for k in mutual_keys:
+            validated_data[k] = data[k]
+        return validated_data
+
     def populate_context_from_lib(self):
 
         self.right_context = []
         if RIGHT_CONTEXT_LIB_KEY in self.font.lib:
             for glyph_data in self.font.lib[RIGHT_CONTEXT_LIB_KEY]:
+                glyph_data = self._validate_data_with_default(glyph_data)
                 self._add_glyph_box_to_right_context(glyph_data)
         else:
-            self._add_glyph_box_to_right_context({"name": "n", "font":None})
+            self._add_glyph_box_to_right_context(DEFAULT_CONTEXT_DICT)
 
         self.mask_context = []
         if MASK_CONTEXT_LIB_KEY in self.font.lib:
             for glyph_data in self.font.lib[MASK_CONTEXT_LIB_KEY]:
+                glyph_data = self._validate_data_with_default(glyph_data)
                 self._add_glyph_box_to_mask_context(glyph_data)
         else:
-            self._add_glyph_box_to_mask_context({"name": "n", "font":None})
+            self._add_glyph_box_to_mask_context(DEFAULT_CONTEXT_DICT)
 
         self.left_context = []
         if MASK_CONTEXT_LIB_KEY in self.font.lib:
             for glyph_data in self.font.lib[LEFT_CONTEXT_LIB_KEY]:
+                glyph_data = self._validate_data_with_default(glyph_data)
                 self._add_glyph_box_to_left_context(glyph_data)
         else:
-            self._add_glyph_box_to_left_context({"name": "n", "font":None})
+            self._add_glyph_box_to_left_context(DEFAULT_CONTEXT_DICT)
 
     # ----------------------------------------
     
@@ -652,7 +710,8 @@ class ContextDisplaySubscriber(Subscriber):
     def glyphEditorWillSetGlyph(self, info):
         for box in [*self.left_context, *self.mask_context, *self.right_context]:
                 box._font_glyph_changed()
-                box._current_glyph_changed()
+                box._glyph_editor_will_set_glyph()
+                # box._current_glyph_changed()
         self.position_context()
 
     def glyphEditorDidMouseMove(self, info):
@@ -739,12 +798,12 @@ class ContextDisplaySubscriber(Subscriber):
 
     def new_glyph_to_right_context(self):
         box = self.add_glyph_to_right_context(DEFAULT_CONTEXT_DICT)
-        box.name = "n"
+        # box.querry = "n"
         box.selected = True
 
     def new_glyph_to_left_context(self):
         box = self.add_glyph_to_left_context(DEFAULT_CONTEXT_DICT)
-        box.name = "n"
+        # box.querry = "n"
         box.selected = True
     
     def add_glyph_to_right_context(self, glyph_data):
@@ -784,9 +843,3 @@ class ContextDisplaySubscriber(Subscriber):
         box = MaskContextGlyph(parent=self, **glyph_data)
         self.mask_context = [box]
         return box
-
-
-
-
-    
-
