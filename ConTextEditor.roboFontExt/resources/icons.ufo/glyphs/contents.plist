@@ -6,5 +6,7 @@
     <string>edit.glif</string>
     <key>toggle</key>
     <string>toggle.glif</string>
+    <key>toggle_old</key>
+    <string>toggle_old.glif</string>
   </dict>
 </plist>

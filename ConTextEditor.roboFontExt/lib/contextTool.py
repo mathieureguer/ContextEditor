@@ -1,7 +1,7 @@
 from context import ContextDisplaySubscriber, toggleSubscriberClass, toggleSubscriberClassOn, toggleSubscriberClassOff, getActiveSubscriberByClass
 
 from mojo.subscriber import *
-from mojo.events import BaseEventTool, installTool
+from mojo.events import BaseEventTool, installTool, setActiveEventTool
 from mojo.UI import CurrentGlyphWindow
 from mojo.extensions import ExtensionBundle
 from lib.UI.toolbarGlyphTools import ToolbarGlyphTools
@@ -51,20 +51,45 @@ class AddToolbarToggleButton(Subscriber):
     def glyphEditorWantsToolbarItems(self, info):
 
         # create the button
-        view = ToolbarGlyphTools((30, 25), [dict(image=toggle_icon, toolTip="Toggle ConText")], trackingMode="one")
+        icons = [
+            dict(image=toggle_icon, toolTip="Toggle ConText"),
+            dict(image=edit_icon, toolTip="Edit ConText")
+            ]
+        toolbar_view = ToolbarGlyphTools((60, 25), icons, trackingMode="one")
+        # edit_view = ToolbarGlyphTools((30, 25), [dict(image=edit_icon, toolTip="Edit ConText")], trackingMode="one")
 
-        newItem = {'itemIdentifier': 'ToggleConText',
-                   'label':          'ConText',
-                   'toolTip':        'Toggle ConText',
-                   'view':           view,
-                   'callback':        self.toggle_callback}
+
+        toolbar_item = {'itemIdentifier': 'ConText',
+                      'label':          'ConText',
+                      'toolTip':        'ConText',
+                      'view':           toolbar_view,
+                      'callback':       self.toolbar_callback}
+
+        # edit_item = {'itemIdentifier': 'EditConText',
+        #             'label':          'Edit ConText',
+        #             'toolTip':        'Edit ConText',
+        #             'view':           edit_view,
+        #             'callback':       self.edit_callback}
 
 
         # add it to the toolbar
-        info['itemDescriptions'].insert(1, newItem)
+        info['itemDescriptions'].insert(1, toolbar_item)
+        # info['itemDescriptions'].insert(1, edit_item)
+
         
+    def toolbar_callback(self, sender):
+        """distribute the callabcks based on segment pressed"""
+        callbacks = [self.toggle_callback, self.edit_callback]
+        selected = sender.selectedSegment()
+        callbacks[selected](sender)
+
     def toggle_callback(self, sender):
         toggleSubscriberClass(ContextDisplaySubscriber, registerGlyphEditorSubscriber)
+
+    def edit_callback(self, sender):
+        setActiveEventTool("ContextEditTool")
+
+
 
 # ----------------------------------------
 

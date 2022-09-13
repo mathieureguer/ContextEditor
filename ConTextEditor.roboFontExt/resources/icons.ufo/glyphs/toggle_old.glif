@@ -1,0 +1,54 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<glyph name="toggle_old" format="2">
+  <advance width="700"/>
+  <outline>
+    <contour>
+      <point x="0.0" y="150.0" type="line"/>
+      <point x="105.0" y="150.0" type="line"/>
+      <point x="105.0" y="550.0" type="line"/>
+      <point x="0.0" y="550.0" type="line"/>
+    </contour>
+    <contour>
+      <point x="105.0" y="404.0" type="line"/>
+      <point x="105.0" y="442"/>
+      <point x="122.20754716981132" y="461.0"/>
+      <point x="153.0" y="461.0" type="curve" smooth="yes"/>
+      <point x="181.125" y="461.0"/>
+      <point x="198" y="445.0"/>
+      <point x="198.0" y="407.0" type="curve" smooth="yes"/>
+      <point x="198.0" y="150.0" type="line"/>
+      <point x="302.0" y="150.0" type="line"/>
+      <point x="302.0" y="437.0" type="line" smooth="yes"/>
+      <point x="302.0" y="520.0"/>
+      <point x="267.0" y="560.0"/>
+      <point x="204.0" y="560.0" type="curve"/>
+      <point x="129" y="560.0"/>
+      <point x="96.0000479169528" y="488.00244376459295"/>
+      <point x="95.0" y="437.0" type="curve"/>
+    </contour>
+    <contour>
+      <point x="398.0" y="150.0" type="line"/>
+      <point x="503.0" y="150.0" type="line"/>
+      <point x="503.0" y="550.0" type="line"/>
+      <point x="398.0" y="550.0" type="line"/>
+    </contour>
+    <contour>
+      <point x="503.0" y="404.0" type="line"/>
+      <point x="503.0" y="442"/>
+      <point x="520" y="461.0"/>
+      <point x="551.0" y="461.0" type="curve" smooth="yes"/>
+      <point x="579" y="461.0"/>
+      <point x="596" y="445.0"/>
+      <point x="596.0" y="407.0" type="curve" smooth="yes"/>
+      <point x="596.0" y="150.0" type="line"/>
+      <point x="700.0" y="150.0" type="line"/>
+      <point x="700.0" y="437.0" type="line" smooth="yes"/>
+      <point x="700.0" y="520.0"/>
+      <point x="665.0" y="560.0"/>
+      <point x="602.0" y="560.0" type="curve"/>
+      <point x="527" y="560.0"/>
+      <point x="494" y="488"/>
+      <point x="493.0" y="437.0" type="curve"/>
+    </contour>
+  </outline>
+</glyph>
