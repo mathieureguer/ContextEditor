@@ -133,13 +133,14 @@ class BaseContextEditorBox():
     # ----------------------------------------
     
     def is_point_inside(self, point):
+        # I guess this could be dealt with by merz directly
         return self.x + self.offset < point[0] < self.x + self.offset + self.width and self.y < point[1] < self.y + self.height
 
     # ----------------------------------------
     
     @property
     def overlayed(self):
-        return self._is_overlayed
+        return self._overlayed
     
     @overlayed.setter
     def overlayed(self, value):
@@ -161,6 +162,18 @@ class BaseContextEditorBox():
         else:
             self.unselected_callback()
 
+    @property
+    def edit_mode(self):
+        return self._edit_mode
+
+    @edit_mode.setter
+    def edit_mode(self, value):
+        self._edit_mode = value
+        if value == True:
+            self.edit_mode_on_callback()
+        else:
+            self.edit_mode_off_callback()
+
     def selected_callback(self):
         pass
 
@@ -172,6 +185,13 @@ class BaseContextEditorBox():
 
     def unoverlayed_callback(self):
         pass
+
+    def edit_mode_on_callback(self):
+        pass
+
+    def edit_mode_off_callback(self):
+        pass
+
    
 class ContextGlyph(BaseContextEditorBox):
     inactive_color = (1, 1, 1, 0)
@@ -179,6 +199,7 @@ class ContextGlyph(BaseContextEditorBox):
     selected_color = (.7, .7, .7, 1)
     
     glyph_color = (0, .4, .6, .8)
+    glyph_color_edit_mode = (0, .6, .8, .8)
     preview_color = (0, 0, 0, 1)
 
     # insertion_point_width = 10
@@ -351,14 +372,25 @@ class ContextGlyph(BaseContextEditorBox):
         self.background_layer = merz.Base()
         self.box_layer = self.build_box_layer()
         self.glyph_layer = self.build_glyph_layer()
+
         self.background_layer.appendSublayer(self.box_layer)
         self.background_layer.appendSublayer(self.glyph_layer)
+
+        # self.delete_button = self.background_layer.appendSymbolSublayer(
+        #                                                 position=(10, self.y + self.height -10),
+        #                                                 imageSettings=dict(
+        #                                                     name="com.mathieureguer.ConTextEditor.deleteSymbol",
+        #                                                     size=(20, 20),
+        #                                                     ),  
+        #                                                 alignment="topLeft"
+        #                                                 )
+        # self.delete_button.setVisible(False)
+        # self.delete_button.setAcceptsHit(True)
 
         self.preview_layer = merz.Base()
         self.glyph_layer_preview = self.build_glyph_layer()
         self.glyph_layer_preview.setFillColor(self.preview_color)
         self.preview_layer.appendSublayer(self.glyph_layer_preview)
-
 
     def build_box_layer(self):
         return merz.Rectangle(position=(self.x, self.y),
@@ -387,10 +419,19 @@ class ContextGlyph(BaseContextEditorBox):
     def unoverlayed_callback(self):
         self.box_layer.setFillColor(self.inactive_color)
 
+    def edit_mode_on_callback(self):
+        self.glyph_layer.setFillColor(self.glyph_color_edit_mode)
+
+    def edit_mode_off_callback(self):
+        self.glyph_layer.setFillColor(self.glyph_color)
+
+
 class MaskContextGlyph(ContextGlyph):
     overlay_color = (.8, .8, .8, 1)
     selected_color = (.7, .7, .7, 1)
     glyph_color =  (0, .4, .6, .5)
+    glyph_color_edit_mode =  (0, .6, .8, .5)
+
 
     @property
     def width(self):
@@ -557,6 +598,73 @@ class LeftContextAddButton(ContextAddButton):
         self.plus_layer.setFillColor(self.inactive_color)
         self.parent.new_glyph_to_left_context()
 
+
+# ----------------------------------------
+
+from merz.tools.drawingTools import NSImageDrawingTools
+
+# I could not figure out symbol hit testing
+# Leaving this here in case I get it to work in the future
+
+def deleteButtonFactory(
+        size,
+        margin_ratio=.15,
+        stroke_ratio=.15,
+        color=(.5, .5, .5, 1),
+        **kwargs
+    ):
+
+    size = (max(size), max(size))
+    width, height = size
+    
+    bot = NSImageDrawingTools((width, height))
+    bot.fill(*color)
+    bot.rotate(45, (width/2, height/2))
+    
+    # draw a circle
+    # i think I have to draw it by hand
+    # in order for it to be in the same bez path as the crosss
+    r = .275
+    p = bot.BezierPath()
+    p.moveTo((0, height/2))
+    p.curveTo((0, height/2+height*r), (width/2-width*r, height), (width/2, height))
+    p.curveTo((width/2+width*r, height), (width, height/2+height*r), (width, height/2))
+    p.curveTo((width, height/2-height*r), (width/2+width*r, 0), (width/2, 0))
+    p.curveTo((width/2-width*r, 0), (0, height/2-height*r), (0, height/2))
+    p.closePath()
+    
+    # now the cross
+    stroke = width * stroke_ratio
+    margin = width*margin_ratio
+        
+    x_0 = margin
+    x_1 = (width-stroke)/2
+    x_2 = x_1 + stroke
+    x_3 = width - margin
+    y_0 = margin
+    y_1 = (height-stroke)/2
+    y_2 = y_1 + stroke
+    y_3 = height - margin
+    
+    p.moveTo((x_2, y_0))
+    p.lineTo((x_2, y_1))
+    p.lineTo((x_3, y_1))
+    p.lineTo((x_3, y_2))
+    p.lineTo((x_2, y_2))
+    p.lineTo((x_2, y_3))
+    p.lineTo((x_1, y_3))
+    p.lineTo((x_1, y_2))
+    p.lineTo((x_0, y_2))
+    p.lineTo((x_0, y_1))
+    p.lineTo((x_1, y_1))
+    p.lineTo((x_1, y_0))
+    p.closePath()
+    bot.drawPath(p)
+
+    return bot.getImage()
+
+# merz.SymbolImageVendor.registerImageFactory("com.mathieureguer.ConTextEditor.deleteSymbol", deleteButtonFactory)
+
 # ----------------------------------------
 
 BASE_LIB_KEY = "com.mathieureguer.ConTextEditor"
@@ -689,6 +797,10 @@ class ContextDisplaySubscriber(Subscriber):
             for box in [*self.left_context, *self.mask_context, *self.right_context]:
                 box.selected = False
                 box.overlayed = False
+                box.edit_mode = False
+        else:
+            for box in [*self.left_context, *self.mask_context, *self.right_context]:
+                box.edit_mode = True
         self.left_add_button.set_visible(value)
         self.right_add_button.set_visible(value)
 
@@ -830,11 +942,13 @@ class ContextDisplaySubscriber(Subscriber):
 
     def _add_glyph_box_to_right_context(self, glyph_data):
         box = ContextGlyph(parent=self, **glyph_data)
+        box.edit_mode = self.edit_mode
         self.right_context.append(box)
         return box
         
     def _add_glyph_box_to_left_context(self, glyph_data):
         box = ContextGlyph(parent=self, **glyph_data)
+        box.edit_mode = self.edit_mode
         self.left_context.append(box)
         return box
 
