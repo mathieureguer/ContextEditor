@@ -24,6 +24,8 @@ def _get_font_string(font):
         return f"{font.info.familyName} {font.info.styleName}"
 
 # ----------------------------------------
+# subcriber toogling 
+# ----------------------------------------
 
 register_function_map = {
         registerRoboFontSubscriber: unregisterRoboFontSubscriber,
@@ -67,6 +69,8 @@ def getActiveSubscriberByClass(SubscriberClass):
     return (registered_subscribers)
 
 # ----------------------------------------
+# Merz helper
+# ----------------------------------------
 
 def merz_counter_offset_pt(layer, point):
     super_layer = layer.getSuperlayer()
@@ -79,6 +83,8 @@ def merz_counter_offset_pt(layer, point):
         return point
 
 # ----------------------------------------
+# UI objects
+# ----------------------------------------
 
 class BaseContextEditorBox():
     def __init__(self, parent=None, **kwarg):
@@ -89,13 +95,13 @@ class BaseContextEditorBox():
         self._width = 100
         self._height = 100
 
-        # self._offset = 0
         self.hit_testing_layer = None
         self._overlayed = False
         self._selected = False
 
     # ----------------------------------------
-    
+    # geometry 
+
     @property
     def x(self):
         return self._x
@@ -129,7 +135,8 @@ class BaseContextEditorBox():
         return []
 
     # ----------------------------------------
-    
+    # hit testing
+
     def is_point_inside(self, point):
         if self.hit_testing_layer:
             offset_point = merz_counter_offset_pt(self.hit_testing_layer, point)
@@ -139,7 +146,8 @@ class BaseContextEditorBox():
         #return self.x + self.offset < point[0] < self.x + self.offset + self.width and self.y < point[1] < self.y + self.height
 
     # ----------------------------------------
-    
+    # mouse events
+
     @property
     def overlayed(self):
         return self._overlayed
@@ -194,6 +202,7 @@ class BaseContextEditorBox():
     def edit_mode_off_callback(self):
         pass
 
+
    
 class ContextGlyph(BaseContextEditorBox):
     inactive_color = (1, 1, 1, 0)
@@ -218,6 +227,7 @@ class ContextGlyph(BaseContextEditorBox):
         # self.offset = offset
 
     # ----------------------------------------
+    # serializing helpers
     
     def as_dict(self):
         return {"querry": self._querry, "font": _get_font_string(self._font)}
@@ -231,6 +241,7 @@ class ContextGlyph(BaseContextEditorBox):
             return None
 
     # ----------------------------------------
+
     @property
     def current_font(self):
         return self.parent.font.asFontParts()
@@ -238,15 +249,17 @@ class ContextGlyph(BaseContextEditorBox):
     @property
     def current_glyph(self):
         return self.parent.glyph
-    
+
+    # ----------------------------------------
+    # geometry
 
     @property
     def width(self):
         return self.glyph.width
-    
-    @property
-    def containers(self):
-        return (self.background_layer, self.preview_layer)
+
+
+    # ----------------------------------------
+    # query
 
     @property
     def querry(self):
@@ -256,7 +269,6 @@ class ContextGlyph(BaseContextEditorBox):
     def querry(self, value):
         self._set_querry(value)
         self._glyph_changed()
-        # self.parent.save_data_to_global()
 
     def _set_querry(self, value):
         querry = value.strip()
@@ -265,7 +277,6 @@ class ContextGlyph(BaseContextEditorBox):
         self._querry = querry
         self._name = name
         self._target_layer = target_layer
-
 
     def _resolve_name_querry(self, name_querry):
         name = name_querry
@@ -281,7 +292,6 @@ class ContextGlyph(BaseContextEditorBox):
             name, layer = querry, font.defaultLayer.name
         return name, layer
 
-
     @property
     def name(self):
         return self._name
@@ -289,7 +299,6 @@ class ContextGlyph(BaseContextEditorBox):
     @property
     def target_layer(self):
         return self._target_layer
-
             
     @property
     def font(self):
@@ -311,7 +320,6 @@ class ContextGlyph(BaseContextEditorBox):
         else:
             self._font = value
 
-
     @property
     def glyph(self):
         font = self.font or self.current_font
@@ -326,21 +334,105 @@ class ContextGlyph(BaseContextEditorBox):
             glyph = RGlyph()
             glyph.width = 200
         return glyph
+    
+    # ----------------------------------------
+    # merz
+
+    @property
+    def containers(self):
+        return (self.background_layer, self.preview_layer)
+
+    def build_merz_layers(self):
+        self.background_layer = merz.Base(position=(self.x, self.y))
+        self.glyph_layer = self.build_glyph_layer()
+        self.box_layer = self.build_box_layer()
+        self.background_layer.appendSublayer(self.box_layer)
+        self.background_layer.appendSublayer(self.glyph_layer)
+        self.hit_testing_layer = self.box_layer
+
+        self.delete_button = self.background_layer.appendSymbolSublayer(
+            name="delete",
+            position=(10, self.height -10),
+            imageSettings=dict(
+                name="com.mathieureguer.ConTextEditor.deleteSymbol",
+                size=(20, 20),
+            ),  
+            alignment="topLeft"
+        )
+        self.delete_button.setVisible(False)
+        self.delete_button.setAcceptsHit(True)
+
+        self.preview_layer = merz.Base(position=(self.x, self.y))
+        self.glyph_layer_preview = self.build_glyph_layer()
+        self.glyph_layer_preview.setFillColor(self.preview_color)
+        self.preview_layer.appendSublayer(self.glyph_layer_preview)
+
+    def build_box_layer(self):
+        return merz.Rectangle(position=(0, 0),
+                              size=(self.width, self.height),
+                              fillColor=self.inactive_color)
+
+    def build_glyph_layer(self):
+        path = merz.Path(position=(0, -self.y))
+        path.setPath(self.glyph.getRepresentation("merz.CGPath"))
+        path.setFillColor(self.glyph_color)
+        return path
 
     # ----------------------------------------
-    
-    # def open_ui(self):
-    #     self.panel.open()
+    # additional hit testing
 
-    # def close_ui(self):
-    #     self.panel.close()
+    def is_delete_pressed(self, point):
+        # thanks for the work around Tal.
+        offset_point = merz_counter_offset_pt(self.delete_button, point)
+        x, y = offset_point
+        rect = (x-50, y-50, x+50, y+50)
+
+        container = self.background_layer.getContainer()
+        hits = container.findSublayersIntersectedByRect(
+                    rect,
+                    onlyAcceptsHit=False,
+                    recurse=True
+                )
+        print("hits", hits)
+        for h in hits:
+            print(h)
+        print("done")
+        print("offset_point")
+        print(self.delete_button.containsPoint(offset_point))
 
     # ----------------------------------------
-    
+    # mouse events
+
+    def selected_callback(self):
+        self.box_layer.setFillColor(self.selected_color)
+        self.panel.open()
+
+    def unselected_callback(self):
+        self.box_layer.setFillColor(self.inactive_color)
+        self.panel.close()
+
+    def overlayed_callback(self):
+        self.box_layer.setFillColor(self.overlay_color)
+        if hasattr(self, "delete_button"):
+            self.delete_button.setVisible(True)
+
+    def unoverlayed_callback(self):
+        self.box_layer.setFillColor(self.inactive_color)
+        if hasattr(self, "delete_button"):
+            self.delete_button.setVisible(False)
+
+    def edit_mode_on_callback(self):
+        self.glyph_layer.setFillColor(self.glyph_color_edit_mode)
+
+    def edit_mode_off_callback(self):
+        self.glyph_layer.setFillColor(self.glyph_color)
+
+    # ----------------------------------------
+    # query events
+
     def _glyph_changed(self):
         self._update_glyph_path()
         self.parent.position_context()
-
 
     def _current_glyph_changed(self):
         # maybe this should always update everything?
@@ -365,91 +457,6 @@ class ContextGlyph(BaseContextEditorBox):
         self.glyph_layer.setPath(p)
         self.glyph_layer_preview.setPath(p)
         self.box_layer.setSize((self.width, self.height))
-    
-    # ----------------------------------------
-    
-    def build_merz_layers(self):
-        self.background_layer = merz.Base(position=(self.x, self.y))
-        self.glyph_layer = self.build_glyph_layer()
-        self.box_layer = self.build_box_layer()
-        self.background_layer.appendSublayer(self.box_layer)
-        self.background_layer.appendSublayer(self.glyph_layer)
-        self.hit_testing_layer = self.box_layer
-
-        self.delete_button = self.background_layer.appendSymbolSublayer(
-                                                        name="delete",
-                                                        position=(10, self.height -10),
-                                                        imageSettings=dict(
-                                                            name="com.mathieureguer.ConTextEditor.deleteSymbol",
-                                                            size=(20, 20),
-                                                            ),  
-                                                        alignment="topLeft"
-                                                        )
-        self.delete_button.setVisible(False)
-        self.delete_button.setAcceptsHit(True)
-
-        self.preview_layer = merz.Base(position=(self.x, self.y))
-        self.glyph_layer_preview = self.build_glyph_layer()
-        self.glyph_layer_preview.setFillColor(self.preview_color)
-        self.preview_layer.appendSublayer(self.glyph_layer_preview)
-
-    def build_box_layer(self):
-        return merz.Rectangle(position=(0, 0),
-                              size=(self.width, self.height),
-                              fillColor=self.inactive_color)
-
-    def build_glyph_layer(self):
-        path = merz.Path(position=(0, -self.y))
-        path.setPath(self.glyph.getRepresentation("merz.CGPath"))
-        path.setFillColor(self.glyph_color)
-        return path
-
-    # ----------------------------------------
-    
-    def is_delete_pressed(self, point):
-        # thanks for the work around Tal.
-        offset_point = merz_counter_offset_pt(self.delete_button, point)
-        x, y = offset_point
-        rect = (x-50, y-50, x+50, y+50)
-
-        container = self.background_layer.getContainer()
-        hits = container.findSublayersIntersectedByRect(
-                    rect,
-                    onlyAcceptsHit=False,
-                    recurse=True
-                )
-        print("hits", hits)
-        for h in hits:
-            print(h)
-        print("done")
-        print("offset_point")
-        print(self.delete_button.containsPoint(offset_point))
-
-    # ----------------------------------------
-    
-    def selected_callback(self):
-        self.box_layer.setFillColor(self.selected_color)
-        self.panel.open()
-
-    def unselected_callback(self):
-        self.box_layer.setFillColor(self.inactive_color)
-        self.panel.close()
-
-    def overlayed_callback(self):
-        self.box_layer.setFillColor(self.overlay_color)
-        if hasattr(self, "delete_button"):
-            self.delete_button.setVisible(True)
-
-    def unoverlayed_callback(self):
-        self.box_layer.setFillColor(self.inactive_color)
-        if hasattr(self, "delete_button"):
-            self.delete_button.setVisible(False)
-
-    def edit_mode_on_callback(self):
-        self.glyph_layer.setFillColor(self.glyph_color_edit_mode)
-
-    def edit_mode_off_callback(self):
-        self.glyph_layer.setFillColor(self.glyph_color)
 
 
 class MaskContextGlyph(ContextGlyph):
@@ -475,8 +482,16 @@ class ContextGlyphPopover():
 
     def build(self):
         self.panel = vanilla.Popover((120, 80))
-        self.panel.name = vanilla.EditText("auto", self.parent.querry, callback=self.name_callback)
-        self.panel.font = vanilla.PopUpButton("auto", self.font_map.keys(), callback=self.font_callback)
+        self.panel.name = vanilla.EditText(
+            "auto", 
+            self.parent.querry, 
+            callback=self.name_callback
+        )
+        self.panel.font = vanilla.PopUpButton(
+            "auto", 
+            self.font_map.keys(), 
+            callback=self.font_callback
+        )
 
         rules = [
             "H:|-margin-[name(200)]-margin-|",
@@ -487,7 +502,7 @@ class ContextGlyphPopover():
         self.panel.addAutoPosSizeRules(rules, metrics)
 
     # ----------------------------------------
-    
+
     def name_callback(self, sender):
         self.parent.querry = sender.get()
 
@@ -546,24 +561,20 @@ class ContextAddButton(BaseContextEditorBox):
 
         self.build_merz_layers()
 
-    # ----------------------------------------
 
+
+    # ----------------------------------------
+    # merz
+    
     @property
     def containers(self):
-        return [self.background_layer]
-
-    # ----------------------------------------
-    
+        return [self.background_layer]    
     
     def get_plus_layer(self):
         
         size = min(self.width, self.height)
         size -= self.margin * 2
-
-        plus = merz.Path()
-        pen = plus.getPen()
-        pen.oval((0, 0, size, size))
-
+  
         x_0 = self.margin
         x_1 = (size-self.stroke)/2
         x_2 = x_1 + self.stroke
@@ -574,6 +585,9 @@ class ContextAddButton(BaseContextEditorBox):
         y_2 = y_1 + self.stroke
         y_3 = size - self.margin
 
+        plus = merz.Path()
+        pen = plus.getPen()
+        pen.oval((0, 0, size, size))
         pen.moveTo((x_1, y_0))
         pen.lineTo((x_1, y_1))
         pen.lineTo((x_0, y_1))
@@ -587,7 +601,6 @@ class ContextAddButton(BaseContextEditorBox):
         pen.lineTo((x_2, y_1))
         pen.lineTo((x_2, y_0))
         pen.closePath()
-
         plus.setFillColor(self.inactive_color)
         plus.setPosition(((self.width-size)/2, (self.height-size)/2))
         return plus
@@ -607,7 +620,8 @@ class ContextAddButton(BaseContextEditorBox):
         self.set_visible(False)
       
         ## I could not get the hit box to work. 
-        ## somehow the hit testing area seemed to drift about 30 units toward the bottom left
+        ## somehow the hit testing area seemed to drift 
+        ## about 30 units toward the bottom left
         # size = min(self.width, self.height)
         # size -= self.margin * 2
         # hit_box = self.background_layer.appendRectangleSublayer(
@@ -623,7 +637,8 @@ class ContextAddButton(BaseContextEditorBox):
         self.background_layer.setVisible(value)
 
     # ----------------------------------------
-    
+    # mouse events
+
     def overlayed_callback(self):
         self.plus_layer.setFillColor(self.overlay_color)
 
@@ -633,10 +648,12 @@ class ContextAddButton(BaseContextEditorBox):
     def selected_callback(self):
         self.plus_layer.setFillColor(self.inactive_color)
 
+
 class RightContextAddButton(ContextAddButton):
     def selected_callback(self):
         self.plus_layer.setFillColor(self.inactive_color)
         self.parent.new_glyph_to_right_context()
+
 
 class LeftContextAddButton(ContextAddButton):
     def selected_callback(self):
@@ -645,11 +662,10 @@ class LeftContextAddButton(ContextAddButton):
 
 
 # ----------------------------------------
+# symbol factories
+# ----------------------------------------
 
 from merz.tools.drawingTools import NSImageDrawingTools
-
-# I could not figure out symbol hit testing
-# Leaving this here in case I get it to work in the future
 
 def deleteButtonFactory(
         size,
@@ -711,6 +727,8 @@ def deleteButtonFactory(
 merz.SymbolImageVendor.registerImageFactory("com.mathieureguer.ConTextEditor.deleteSymbol", deleteButtonFactory)
 
 # ----------------------------------------
+# controller
+# ----------------------------------------
 
 BASE_LIB_KEY = "com.mathieureguer.ConTextEditor"
 RIGHT_CONTEXT_LIB_KEY = BASE_LIB_KEY + ".right_context"
@@ -729,14 +747,16 @@ class ContextDisplaySubscriber(Subscriber):
         
         glyphEditor = self.getGlyphEditor()
         self.container_background = glyphEditor.extensionContainer(
-                    identifier="com.mathieureguer.contextEditor.background",
-                    location="background",
-                    clear=True)
+            identifier="com.mathieureguer.contextEditor.background",
+            location="background",
+            clear=True
+        )
 
         self.container_preview = glyphEditor.extensionContainer(
-                    identifier="com.mathieureguer.contextEditor.background",
-                    location="preview",
-                    clear=True)
+            identifier="com.mathieureguer.contextEditor.background",
+            location="preview",
+            clear=True
+        )
 
         self.build_context()
         self.position_context()
@@ -863,7 +883,11 @@ class ContextDisplaySubscriber(Subscriber):
     # ----------------------------------------
     
     def glyphEditorWillSetGlyph(self, info):
-        for box in [*self.left_context, *self.mask_context, *self.right_context]:
+        for box in [
+            *self.left_context, 
+            *self.mask_context, 
+            *self.right_context
+            ]:
                 # box._font_glyph_changed()
                 box._glyph_editor_will_set_glyph()
                 # box._current_glyph_changed()
@@ -872,7 +896,13 @@ class ContextDisplaySubscriber(Subscriber):
     def glyphEditorDidMouseMove(self, info):
         if self.edit_mode:
             point = info["locationInGlyph"]
-            for box in [self.left_add_button, *self.left_context, *self.mask_context, *self.right_context, self.right_add_button]:
+            for box in [
+                self.left_add_button, 
+                *self.left_context, 
+                *self.mask_context, 
+                *self.right_context, 
+                self.right_add_button
+                ]:
                 if box.selected == False:
                     if box.is_point_inside(point):
                         box.overlayed = True
@@ -882,7 +912,13 @@ class ContextDisplaySubscriber(Subscriber):
     def glyphEditorDidMouseDown(self, info):
         if self.edit_mode:
             point = info["locationInGlyph"]
-            for box in [self.left_add_button, *self.left_context, *self.mask_context, *self.right_context, self.right_add_button]:
+            for box in [
+                self.left_add_button, 
+                *self.left_context, 
+                *self.mask_context, 
+                *self.right_context, 
+                self.right_add_button
+                ]:
                 if box.is_point_inside(point):
                     box.selected = True
                     print("testing delete")
@@ -952,8 +988,6 @@ class ContextDisplaySubscriber(Subscriber):
     # glyph box are stored in parrallel in a set of class variable
     # in order to share them across subscribers 
     # and preserve then when subscribers are unregistered
-
-
 
     def new_glyph_to_right_context(self):
         box = self.add_glyph_to_right_context(DEFAULT_CONTEXT_DICT)
