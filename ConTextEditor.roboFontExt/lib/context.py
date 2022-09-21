@@ -16,15 +16,6 @@ LAYER_NAME_TOKEN = "@"
 DEFAULT_CONTEXT_DICT = {"querry": "n", "font": None}
 
 # ----------------------------------------
-# a set of global variable to keep some peristent data
-# I am not sure this is a great idea
-
-# global_left_context = []
-# global_mask_context = []
-# global_right_context = []
-
-
-# ----------------------------------------
 
 def _get_font_string(font):
     if font == None:
@@ -75,6 +66,17 @@ def getActiveSubscriberByClass(SubscriberClass):
     registered_subscribers = listRegisteredSubscribers(subscriberClassName=SubscriberClass.__name__)
     return (registered_subscribers)
 
+# ----------------------------------------
+
+def merz_counter_offset_pt(layer, point):
+    super_layer = layer.getSuperlayer()
+    if super_layer:    
+        pt_x, pt_y = point
+        l_x, l_y = super_layer.getPosition()
+        point = (pt_x - l_x, pt_y - l_y)
+        return merz_counter_offset_pt(super_layer, point)
+    else:
+        return point
 
 # ----------------------------------------
 
@@ -87,8 +89,8 @@ class BaseContextEditorBox():
         self._width = 100
         self._height = 100
 
-        self._offset = 0
-
+        # self._offset = 0
+        self.hit_testing_layer = None
         self._overlayed = False
         self._selected = False
 
@@ -97,6 +99,13 @@ class BaseContextEditorBox():
     @property
     def x(self):
         return self._x
+
+    @x.setter
+    def x(self, value):
+        self._x = value
+        for c in self.containers:
+            x, y = c.getPosition()
+            c.setPosition((value, y))
 
     @property
     def y(self):
@@ -112,7 +121,8 @@ class BaseContextEditorBox():
 
     @property
     def bounds(self):
-        return self.x + self.offset, self.y, self.width, self.height
+        return self.x, self.y, self.width, self.height
+        # return self.x + self.offset, self.y, self.width, self.height
 
     @property
     def containers(self):
@@ -120,21 +130,13 @@ class BaseContextEditorBox():
 
     # ----------------------------------------
     
-    @property
-    def offset(self):
-        return self._offset
-
-    @offset.setter
-    def offset(self, value):
-        self._offset = value
-        for c in self.containers:
-            c.setPosition((value, 0))
-
-    # ----------------------------------------
-    
     def is_point_inside(self, point):
+        if self.hit_testing_layer:
+            offset_point = merz_counter_offset_pt(self.hit_testing_layer, point)
+            return self.hit_testing_layer.containsPoint(offset_point)
+        
         # I guess this could be dealt with by merz directly
-        return self.x + self.offset < point[0] < self.x + self.offset + self.width and self.y < point[1] < self.y + self.height
+        #return self.x + self.offset < point[0] < self.x + self.offset + self.width and self.y < point[1] < self.y + self.height
 
     # ----------------------------------------
     
@@ -202,8 +204,6 @@ class ContextGlyph(BaseContextEditorBox):
     glyph_color_edit_mode = (0, .6, .8, .8)
     preview_color = (0, 0, 0, 1)
 
-    # insertion_point_width = 10
-
     def __init__(self, querry="n", font=None, parent=None, offset=0):
         super().__init__(parent=parent)
         self._set_font(font)
@@ -215,7 +215,7 @@ class ContextGlyph(BaseContextEditorBox):
         
         self.build_merz_layers()
         self.panel = ContextGlyphPopover(self)
-        self.offset = offset
+        # self.offset = offset
 
     # ----------------------------------------
     
@@ -369,39 +369,61 @@ class ContextGlyph(BaseContextEditorBox):
     # ----------------------------------------
     
     def build_merz_layers(self):
-        self.background_layer = merz.Base()
-        self.box_layer = self.build_box_layer()
+        self.background_layer = merz.Base(position=(self.x, self.y))
         self.glyph_layer = self.build_glyph_layer()
-
+        self.box_layer = self.build_box_layer()
         self.background_layer.appendSublayer(self.box_layer)
         self.background_layer.appendSublayer(self.glyph_layer)
+        self.hit_testing_layer = self.box_layer
 
-        # self.delete_button = self.background_layer.appendSymbolSublayer(
-        #                                                 position=(10, self.y + self.height -10),
-        #                                                 imageSettings=dict(
-        #                                                     name="com.mathieureguer.ConTextEditor.deleteSymbol",
-        #                                                     size=(20, 20),
-        #                                                     ),  
-        #                                                 alignment="topLeft"
-        #                                                 )
-        # self.delete_button.setVisible(False)
-        # self.delete_button.setAcceptsHit(True)
+        self.delete_button = self.background_layer.appendSymbolSublayer(
+                                                        name="delete",
+                                                        position=(10, self.height -10),
+                                                        imageSettings=dict(
+                                                            name="com.mathieureguer.ConTextEditor.deleteSymbol",
+                                                            size=(20, 20),
+                                                            ),  
+                                                        alignment="topLeft"
+                                                        )
+        self.delete_button.setVisible(False)
+        self.delete_button.setAcceptsHit(True)
 
-        self.preview_layer = merz.Base()
+        self.preview_layer = merz.Base(position=(self.x, self.y))
         self.glyph_layer_preview = self.build_glyph_layer()
         self.glyph_layer_preview.setFillColor(self.preview_color)
         self.preview_layer.appendSublayer(self.glyph_layer_preview)
 
     def build_box_layer(self):
-        return merz.Rectangle(position=(self.x, self.y),
+        return merz.Rectangle(position=(0, 0),
                               size=(self.width, self.height),
                               fillColor=self.inactive_color)
 
     def build_glyph_layer(self):
-        path = merz.Path()
+        path = merz.Path(position=(0, -self.y))
         path.setPath(self.glyph.getRepresentation("merz.CGPath"))
         path.setFillColor(self.glyph_color)
         return path
+
+    # ----------------------------------------
+    
+    def is_delete_pressed(self, point):
+        # thanks for the work around Tal.
+        offset_point = merz_counter_offset_pt(self.delete_button, point)
+        x, y = offset_point
+        rect = (x-50, y-50, x+50, y+50)
+
+        container = self.background_layer.getContainer()
+        hits = container.findSublayersIntersectedByRect(
+                    rect,
+                    onlyAcceptsHit=False,
+                    recurse=True
+                )
+        print("hits", hits)
+        for h in hits:
+            print(h)
+        print("done")
+        print("offset_point")
+        print(self.delete_button.containsPoint(offset_point))
 
     # ----------------------------------------
     
@@ -415,9 +437,13 @@ class ContextGlyph(BaseContextEditorBox):
 
     def overlayed_callback(self):
         self.box_layer.setFillColor(self.overlay_color)
+        if hasattr(self, "delete_button"):
+            self.delete_button.setVisible(True)
 
     def unoverlayed_callback(self):
         self.box_layer.setFillColor(self.inactive_color)
+        if hasattr(self, "delete_button"):
+            self.delete_button.setVisible(False)
 
     def edit_mode_on_callback(self):
         self.glyph_layer.setFillColor(self.glyph_color_edit_mode)
@@ -517,7 +543,6 @@ class ContextAddButton(BaseContextEditorBox):
         self._y = 0
         self._height = self.parent.font.info.xHeight
         self._width = 350
-        self._offset = 0
 
         self.build_merz_layers()
 
@@ -568,11 +593,31 @@ class ContextAddButton(BaseContextEditorBox):
         return plus
 
     def build_merz_layers(self):
-        self.background_layer = merz.Base()
+        self.background_layer = merz.Base(
+            position=(self.x, self.y),
+            size=(0, 0),
+        )
+        self.box_layer = self.background_layer.appendRectangleSublayer(
+            position=(0, 0),
+            size=(self.width, self.height),
+            fillColor=(0, 0, 0, 0),
+        )                                          
         self.plus_layer = self.get_plus_layer()
         self.background_layer.appendSublayer(self.plus_layer)
         self.set_visible(False)
-
+      
+        ## I could not get the hit box to work. 
+        ## somehow the hit testing area seemed to drift about 30 units toward the bottom left
+        # size = min(self.width, self.height)
+        # size -= self.margin * 2
+        # hit_box = self.background_layer.appendRectangleSublayer(
+        #     position=((self.width-size)/2, (self.height-size)/2),
+        #     position=(50, 50),
+        #     size=(size, size),
+        #     fillColor =(1, 0, 0, .3)
+        # )
+ 
+        self.hit_testing_layer = self.box_layer
 
     def set_visible(self, value):
         self.background_layer.setVisible(value)
@@ -619,7 +664,7 @@ def deleteButtonFactory(
     
     bot = NSImageDrawingTools((width, height))
     bot.fill(*color)
-    bot.rotate(45, (width/2, height/2))
+    #bot.rotate(45, (width/2, height/2))
     
     # draw a circle
     # i think I have to draw it by hand
@@ -663,7 +708,7 @@ def deleteButtonFactory(
 
     return bot.getImage()
 
-# merz.SymbolImageVendor.registerImageFactory("com.mathieureguer.ConTextEditor.deleteSymbol", deleteButtonFactory)
+merz.SymbolImageVendor.registerImageFactory("com.mathieureguer.ConTextEditor.deleteSymbol", deleteButtonFactory)
 
 # ----------------------------------------
 
@@ -840,6 +885,9 @@ class ContextDisplaySubscriber(Subscriber):
             for box in [self.left_add_button, *self.left_context, *self.mask_context, *self.right_context, self.right_add_button]:
                 if box.is_point_inside(point):
                     box.selected = True
+                    print("testing delete")
+                    if box.is_delete_pressed(point):
+                        box.self.delete_button.setColor((1, 0, 0, 1))                        
                 else:
                     box.selected = False
 
@@ -888,12 +936,12 @@ class ContextDisplaySubscriber(Subscriber):
         current_offset = 0
         for box in [*self.left_context, self.left_add_button]:
             current_offset -= box.width
-            box.offset = current_offset
+            box.x = current_offset
 
     def position_right_context(self):
         current_offset = self.glyph.width
         for box in [*self.right_context, self.right_add_button]:
-            box.offset = current_offset
+            box.x = current_offset
             current_offset += box.width
 
     def clear_context(self):
