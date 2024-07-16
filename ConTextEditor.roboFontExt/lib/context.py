@@ -11,6 +11,7 @@ import pathlib
 
 CURRENT_FONT_MENU_NAME = "CurrentFont"
 CURRENT_GLYPH_TAG = "<self>"
+ROOT_GLYPH_TAG = "<root>"
 LAYER_NAME_TOKEN = "@"
 
 DEFAULT_CONTEXT_DICT = {"querry": "n", "font": None}
@@ -72,21 +73,43 @@ def getActiveSubscriberByClass(SubscriberClass):
 # Merz helper
 # ----------------------------------------
 
+## this is very hacky. I am sorry.
+
 def merz_counter_offset_pt(layer, point):
-    super_layer = layer.getSuperlayer()
-    if super_layer:    
-        pt_x, pt_y = point
-        l_x, l_y = super_layer.getPosition()
-        point = (pt_x - l_x, pt_y - l_y)
-        return merz_counter_offset_pt(super_layer, point)
-    else:
-        return point
+    if layer != None:
+        super_layer = layer.getSuperlayer()
+        if super_layer != None:    
+            pt_x, pt_y = point
+            l_x, l_y = super_layer.getPosition()
+            point = (pt_x - l_x, pt_y - l_y)
+            return merz_counter_offset_pt(super_layer, point)
+        else:
+            return point
+
+def merz_get_absolute_position(layer):
+    layer_stack = _get_super_layer_recursive(layer, [])
+    pt_x = 0
+    pt_y = 0
+    for l in layer_stack:
+        l_x, l_y = l.getPosition()
+        pt_x += l_x
+        pt_y += l_y
+    return pt_x, pt_y
+
+def _get_super_layer_recursive(layer, layer_list):
+    layer_list.append(layer)
+    if layer.getSuperlayer() != None:
+        _get_super_layer_recursive(layer.getSuperlayer(), layer_list)
+    return layer_list
+
 
 # ----------------------------------------
 # UI objects
 # ----------------------------------------
 
 class BaseContextEditorBox():
+    allow_delete = False
+
     def __init__(self, parent=None, **kwarg):
         self.parent = parent 
 
@@ -213,6 +236,8 @@ class ContextGlyph(BaseContextEditorBox):
     glyph_color_edit_mode = (0, .6, .8, .8)
     preview_color = (0, 0, 0, 1)
 
+    allow_delete = True
+
     def __init__(self, querry="n", font=None, parent=None, offset=0):
         super().__init__(parent=parent)
         self._set_font(font)
@@ -259,7 +284,7 @@ class ContextGlyph(BaseContextEditorBox):
 
 
     # ----------------------------------------
-    # query
+    # querry
 
     @property
     def querry(self):
@@ -281,7 +306,9 @@ class ContextGlyph(BaseContextEditorBox):
     def _resolve_name_querry(self, name_querry):
         name = name_querry
         if CURRENT_GLYPH_TAG in name:
-            name = name.replace(CURRENT_GLYPH_TAG, self.current_glyph.name)
+            name = self._resolve_current_glyph(name)
+        if ROOT_GLYPH_TAG in name:
+            name = self._resolve_root_glyph(name)
         return name
 
     def _split_name_and_layer(self, querry):
@@ -292,6 +319,18 @@ class ContextGlyph(BaseContextEditorBox):
             name, layer = querry, font.defaultLayer.name
         return name, layer
 
+    #------------------------------
+    # querry key words:
+
+    def _resolve_current_glyph(self, querry):
+        return querry.replace(CURRENT_GLYPH_TAG, self.current_glyph.name)
+
+    def _resolve_root_glyph(self, querry):
+        root = self.current_glyph.name.split(".")[0]
+        return querry.replace(ROOT_GLYPH_TAG, root)
+
+    #------------------------------
+    
     @property
     def name(self):
         return self._name
@@ -356,11 +395,11 @@ class ContextGlyph(BaseContextEditorBox):
             imageSettings=dict(
                 name="com.mathieureguer.ConTextEditor.deleteSymbol",
                 size=(20, 20),
+                acceptsHit=True,
+                # alignment="topLeft"
             ),  
-            alignment="topLeft"
         )
         self.delete_button.setVisible(False)
-        self.delete_button.setAcceptsHit(True)
 
         self.preview_layer = merz.Base(position=(self.x, self.y))
         self.glyph_layer_preview = self.build_glyph_layer()
@@ -383,32 +422,55 @@ class ContextGlyph(BaseContextEditorBox):
 
     def is_delete_pressed(self, point):
         # thanks for the work around Tal.
-        offset_point = merz_counter_offset_pt(self.delete_button, point)
-        x, y = offset_point
-        rect = (x-50, y-50, x+50, y+50)
+        # print("delete testing")
+        # offset_point = merz_counter_offset_pt(self.delete_button, point)
+        # x, y = offset_point
+        # rect = (x-50, y-50, 100, 100)
+        # print("delete pos", self.delete_button.getPosition())
+        # print("point", point)
+        # print("offset point", offset_point)
+        # print("rect", rect)
+        # container = self.background_layer.getContainer()
+        # hits = container.findSublayersIntersectedByRect(
+        #             rect,
+        #             onlyAcceptsHit=False,
+        #             recurse=True
+        #         )
+        # print("hits", hits)
+        # for h in hits:
+        #     print(h)
+        # print("done")
+        # print("offset_point")
+        x, y = point
+        radius = 30
+        absolute_x, absolute_y = merz_get_absolute_position(self.delete_button)
+        if x-radius < absolute_x < x+radius and y-radius < absolute_y < y+radius:
+            return True
+        # print("testing del")
+        # for x in range(-2000, 2000, 20):
+        #     for y in range(-2000, 2000, 20):
+        #         rect = (x-20, y-20, 40, 40)
+        #         if self.delete_button.isContainedByRect(rect):
+        #             print("intersect", x, y, "pos", self.delete_button.getPosition())
 
-        container = self.background_layer.getContainer()
-        hits = container.findSublayersIntersectedByRect(
-                    rect,
-                    onlyAcceptsHit=False,
-                    recurse=True
-                )
-        print("hits", hits)
-        for h in hits:
-            print(h)
-        print("done")
-        print("offset_point")
-        print(self.delete_button.containsPoint(offset_point))
+        # print(self.delete_button.isIntersectedByRect((*point, 50, 50)))
+        # print(self.delete_button.isIntersectedByRect(rect))
+        # other_rect = (0, 400, 400, 400)
+        # print(self.delete_button.isIntersectedByRect(rect))
 
     # ----------------------------------------
     # mouse events
 
     def selected_callback(self):
         self.box_layer.setFillColor(self.selected_color)
+        if hasattr(self, "delete_button"):
+            self.delete_button.setVisible(True)
         self.panel.open()
 
     def unselected_callback(self):
         self.box_layer.setFillColor(self.inactive_color)
+        if hasattr(self, "delete_button"):
+            self.delete_button.setVisible(False)
         self.panel.close()
 
     def overlayed_callback(self):
@@ -680,7 +742,7 @@ def deleteButtonFactory(
     
     bot = NSImageDrawingTools((width, height))
     bot.fill(*color)
-    #bot.rotate(45, (width/2, height/2))
+    bot.rotate(45, (width/2, height/2))
     
     # draw a circle
     # i think I have to draw it by hand
@@ -920,10 +982,12 @@ class ContextDisplaySubscriber(Subscriber):
                 self.right_add_button
                 ]:
                 if box.is_point_inside(point):
-                    box.selected = True
-                    print("testing delete")
-                    if box.is_delete_pressed(point):
-                        box.self.delete_button.setColor((1, 0, 0, 1))                        
+                    if box.allow_delete and box.is_delete_pressed(point):
+                        box._selected = True
+                        self.delete_selected_box()
+                        box.selected = False
+                    else:                     
+                        box.selected = True
                 else:
                     box.selected = False
 
