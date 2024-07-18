@@ -19,15 +19,15 @@ LAYER_NAME_TOKEN = "@"
 DEFAULT_CONTEXT_DICT = {"querry": "n", "font": None}
 
 DEFAULTS = {
-    "neighbor_color_light" : (0, .4, .6, .8),
-    "neighbor_color_dark"  : (1, .4, .6, .8),
-    "mask_color_light"     : (0, .4, .6, .8),
-    "mask_color_dark"      : (1, .4, .6, .8),
-    "edit_color_light"     : (0, .4, .3, .8),
-    "edit_color_dark"      : (1, .4, .6, .8),
+    "neighbor_color_light" : (.24, .75, .9, 1),
+    "neighbor_color_dark"  : (.6, .3, .5, 1),
+    "mask_color_light"     : (.5, .7, .7, .7),
+    "mask_color_dark"      : (.4, .15, .4, .7),
+    "edit_color_light"     : (0, 1, 1, 1),
+    "edit_color_dark"      : (0.9, 0, .6, 1),
 }
 
-DEFAULT_KEY = "com.mathieureguer.ConTextEditor"
+DEFAULT_KEY = "com.mathieureguer.ConTextEditor."
 
 # ----------------------------------------
 
