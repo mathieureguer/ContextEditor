@@ -1,4 +1,5 @@
 from context import ContextDisplaySubscriber, toggleSubscriberClass, toggleSubscriberClassOn, toggleSubscriberClassOff, getActiveSubscriberByClass
+from contextEvent import register_custom_event
 
 from mojo.subscriber import *
 from mojo.events import BaseEventTool, installTool, setActiveEventTool
@@ -95,4 +96,5 @@ class AddToolbarToggleButton(Subscriber):
 
 installTool(ContextEditTool())
 registerRoboFontSubscriber(AddToolbarToggleButton)
+register_custom_event()
 
