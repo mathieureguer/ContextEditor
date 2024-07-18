@@ -1186,3 +1186,4 @@ class ContextDisplaySubscriber(Subscriber):
         box = MaskContextGlyph(parent=self, **glyph_data)
         self.mask_context = [box]
         return box
+        
