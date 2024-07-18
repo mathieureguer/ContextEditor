@@ -1,11 +1,13 @@
 from mojo.subscriber import *
-from mojo.UI import CurrentGlyphWindow
+from mojo.UI import CurrentGlyphWindow, inDarkMode, getDefault
 from mojo.roboFont import CurrentGlyph, CurrentFont, AllFonts, RGlyph
 
 import merz
 import vanilla
 
 import pathlib
+
+from EzuiExtentionSettingsManager import ExtentionSettingsManager
 
 # ----------------------------------------
 
@@ -15,6 +17,17 @@ ROOT_GLYPH_TAG = "<root>"
 LAYER_NAME_TOKEN = "@"
 
 DEFAULT_CONTEXT_DICT = {"querry": "n", "font": None}
+
+DEFAULTS = {
+    "neighbor_color_light" : (0, .4, .6, .8),
+    "neighbor_color_dark"  : (1, .4, .6, .8),
+    "mask_color_light"     : (0, .4, .6, .8),
+    "mask_color_dark"      : (1, .4, .6, .8),
+    "edit_color_light"     : (0, .4, .3, .8),
+    "edit_color_dark"      : (1, .4, .6, .8),
+}
+
+DEFAULT_KEY = "com.mathieureguer.ConTextEditor"
 
 # ----------------------------------------
 
@@ -121,6 +134,8 @@ class BaseContextEditorBox():
         self.hit_testing_layer = None
         self._overlayed = False
         self._selected = False
+
+        self._edit_mode = False
 
     # ----------------------------------------
     # geometry 
@@ -229,12 +244,18 @@ class BaseContextEditorBox():
    
 class ContextGlyph(BaseContextEditorBox):
     inactive_color = (1, 1, 1, 0)
-    overlay_color = (.8, .8, .8, 1)
-    selected_color = (.7, .7, .7, 1)
     
-    glyph_color = (0, .4, .6, .8)
-    glyph_color_edit_mode = (0, .6, .8, .8)
-    preview_color = (0, 0, 0, 1)
+    overlay_color_light = (.8, .8, .8, 1)
+    overlay_color_dark  = (.8, .8, .8, 1)
+    
+    selected_color_light = (.7, .7, .7, 1)
+    selected_color_dark  = (.7, .7, .7, 1)
+    
+    glyph_color_light = DEFAULTS["neighbor_color_light"]
+    glyph_color_dark  = DEFAULTS["neighbor_color_dark"]
+
+    glyph_color_edit_mode_light = DEFAULTS["edit_color_light"]
+    glyph_color_edit_mode_dark  = DEFAULTS["edit_color_dark"]
 
     allow_delete = True
 
@@ -403,8 +424,9 @@ class ContextGlyph(BaseContextEditorBox):
 
         self.preview_layer = merz.Base(position=(self.x, self.y))
         self.glyph_layer_preview = self.build_glyph_layer()
-        self.glyph_layer_preview.setFillColor(self.preview_color)
         self.preview_layer.appendSublayer(self.glyph_layer_preview)
+
+        self.update_colors()
 
     def build_box_layer(self):
         return merz.Rectangle(position=(0, 0),
@@ -414,7 +436,6 @@ class ContextGlyph(BaseContextEditorBox):
     def build_glyph_layer(self):
         path = merz.Path(position=(0, -self.y))
         path.setPath(self.glyph.getRepresentation("merz.CGPath"))
-        path.setFillColor(self.glyph_color)
         return path
 
     # ----------------------------------------
@@ -462,7 +483,10 @@ class ContextGlyph(BaseContextEditorBox):
     # mouse events
 
     def selected_callback(self):
-        self.box_layer.setFillColor(self.selected_color)
+        if inDarkMode():
+            self.box_layer.setFillColor(self.selected_color_dark)
+        else:
+            self.box_layer.setFillColor(self.selected_color_light)
         if hasattr(self, "delete_button"):
             self.delete_button.setVisible(True)
         self.panel.open()
@@ -474,7 +498,10 @@ class ContextGlyph(BaseContextEditorBox):
         self.panel.close()
 
     def overlayed_callback(self):
-        self.box_layer.setFillColor(self.overlay_color)
+        if inDarkMode():
+            self.box_layer.setFillColor(self.overlay_color_dark)
+        else:
+            self.box_layer.setFillColor(self.overlay_color_light)
         if hasattr(self, "delete_button"):
             self.delete_button.setVisible(True)
 
@@ -484,10 +511,16 @@ class ContextGlyph(BaseContextEditorBox):
             self.delete_button.setVisible(False)
 
     def edit_mode_on_callback(self):
-        self.glyph_layer.setFillColor(self.glyph_color_edit_mode)
+        if inDarkMode():
+            self.glyph_layer.setFillColor(self.glyph_color_edit_mode_dark)
+        else:
+            self.glyph_layer.setFillColor(self.glyph_color_edit_mode_light)
 
     def edit_mode_off_callback(self):
-        self.glyph_layer.setFillColor(self.glyph_color)
+        if inDarkMode():
+            self.glyph_layer.setFillColor(self.glyph_color_dark)
+        else:
+            self.glyph_layer.setFillColor(self.glyph_color_light)
 
     # ----------------------------------------
     # query events
@@ -521,13 +554,32 @@ class ContextGlyph(BaseContextEditorBox):
         self.box_layer.setSize((self.width, self.height))
 
 
+    def update_colors(self):
+        if inDarkMode():
+            if self.edit_mode:
+                self.glyph_layer.setFillColor(self.glyph_color_edit_mode_dark)
+            else:
+                self.glyph_layer.setFillColor(self.glyph_color_dark)
+            self.glyph_layer_preview.setFillColor(getDefault("glyphViewPreviewFillColor.dark"))
+        else:
+            if self.edit_mode:
+                self.glyph_layer.setFillColor(self.glyph_color_edit_mode_light)
+            else:
+                self.glyph_layer.setFillColor(self.glyph_color_light)            
+            self.glyph_layer_preview.setFillColor(getDefault("glyphViewPreviewFillColor"))
+
 class MaskContextGlyph(ContextGlyph):
-    overlay_color = (.8, .8, .8, 1)
-    selected_color = (.7, .7, .7, 1)
-    glyph_color =  (0, .4, .6, .5)
-    glyph_color_edit_mode =  (0, .6, .8, .5)
-
-
+    # overlay_color_light = (.8, .8, .8, 1)
+    # overlay_color_dark  = (.8, .8, .8, 1)
+    
+    # selected_color_light = (.7, .7, .7, 1)
+    # selected_color_dark  = (.7, .7, .7, 1)
+    
+    glyph_color_light =  DEFAULTS["mask_color_light"]
+    glyph_color_dark  =  DEFAULTS["mask_color_dark"]
+    # glyph_color_edit_mode_light =  (0, .6, .8, .5)
+    # glyph_color_edit_mode_dark  =  (0, .6, .8, .5)
+ 
     @property
     def width(self):
         return self.current_glyph.width
@@ -606,6 +658,7 @@ class ContextGlyphPopover():
         x_view_offset, y_view_offset = glyph_view.offset()
         view_scale = glyph_view.scale()
         return (x + x_view_offset)*view_scale, (y + y_view_offset)*view_scale, w*view_scale, h*view_scale
+
 
 class ContextAddButton(BaseContextEditorBox):
     inactive_color = (.8, .8, .8, 1)
@@ -792,17 +845,21 @@ merz.SymbolImageVendor.registerImageFactory("com.mathieureguer.ConTextEditor.del
 # controller
 # ----------------------------------------
 
-BASE_LIB_KEY = "com.mathieureguer.ConTextEditor"
-RIGHT_CONTEXT_LIB_KEY = BASE_LIB_KEY + ".right_context"
-MASK_CONTEXT_LIB_KEY = BASE_LIB_KEY + ".mask_context"
-LEFT_CONTEXT_LIB_KEY = BASE_LIB_KEY + ".left_context"
+RIGHT_CONTEXT_LIB_KEY = DEFAULT_KEY + ".right_context"
+MASK_CONTEXT_LIB_KEY = DEFAULT_KEY + ".mask_context"
+LEFT_CONTEXT_LIB_KEY = DEFAULT_KEY + ".left_context"
 
 class ContextDisplaySubscriber(Subscriber):
+    debug = True
     # global_left_context = [DEFAULT_CONTEXT_DICT]
     # global_mask_context = [DEFAULT_CONTEXT_DICT]
     # global_right_context = [DEFAULT_CONTEXT_DICT]
 
     def build(self):
+        self.settings_manager = ExtentionSettingsManager(self, DEFAULT_KEY)
+        self.settings_manager.register_extention_defaults(DEFAULTS)
+        self.settings_manager.load_extention_settings()
+
         self._edit_mode = False
         self.left_add_button = LeftContextAddButton(self)
         self.right_add_button = RightContextAddButton(self)
@@ -822,6 +879,7 @@ class ContextDisplaySubscriber(Subscriber):
 
         self.build_context()
         self.position_context()
+        self.colorize_context()
 
     def destroy(self):
         self.save_context_to_font_lib()
@@ -1007,6 +1065,32 @@ class ContextDisplaySubscriber(Subscriber):
     def glyphEditorGlyphDidChangeMetrics(self, info):
         self.position_context()
 
+    def roboFontAppearanceChanged(self, info):
+        for context in self.left_context + self.right_context:
+            context.update_colors()
+
+    def roboFontDidChangePreferences(self, info):
+        for context in self.left_context + self.right_context:
+            context.update_colors()
+
+    # ----------------------------------------
+    
+    def contexteditorDidChangeSettings(self, info):
+        self.settings_manager.load_extention_settings()
+        self.colorize_context()
+
+    def colorize_context(self):
+        ContextGlyph.glyph_color_light = self.settings_manager["neighbor_color_light"]
+        ContextGlyph.glyph_color_dark  = self.settings_manager["neighbor_color_dark"]
+        ContextGlyph.glyph_color_edit_mode_light = self.settings_manager["edit_color_light"]
+        ContextGlyph.glyph_color_edit_mode_dark  = self.settings_manager["edit_color_dark"]
+        MaskContextGlyph.glyph_color_light = self.settings_manager["mask_color_light"]
+        MaskContextGlyph.glyph_color_dark  = self.settings_manager["mask_color_dark"]
+        MaskContextGlyph.glyph_color_edit_mode_light = self.settings_manager["edit_color_light"]
+        MaskContextGlyph.glyph_color_edit_mode_dark  = self.settings_manager["edit_color_dark"]
+
+        for box in self.left_context + self.mask_context + self.right_context:
+            box.update_colors()
 
     # ----------------------------------------
 

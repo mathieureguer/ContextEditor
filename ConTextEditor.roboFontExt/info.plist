@@ -12,6 +12,14 @@
             <key>shortKey</key>
             <string>T</string>
         </dict>
+        <dict>
+        <key>path</key>
+        <string>contextSettings.py</string>
+        <key>preferredName</key>
+        <string>Settings</string>
+        <key>shortKey</key>
+        <string></string>
+        </dict>
     </array>
     <key>developer</key>
     <string>Mathieu Reguer</string>
@@ -30,8 +38,8 @@
     <key>requiresVersionMinor</key>
     <string>0</string>
     <key>timeStamp</key>
-    <real>1650990063.776439</real>
+    <real>1650990063.776440</real>
     <key>version</key>
-    <string>0.2</string>
+    <string>0.3</string>
 </dict>
 </plist>
