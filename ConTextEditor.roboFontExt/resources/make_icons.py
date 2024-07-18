@@ -28,7 +28,7 @@ MARGIN = 40
 BACKGROUND = (0, .5, .5)
 FOREGROUND = (1, 1, 1)
 GLYPH = "edit"
-PATH = "icon.png"
+PATH = "../../resources/icon.png"
 
 def round_rect(x, y, w, h, radius, curvature=.55):
     bez = BezierPath()
