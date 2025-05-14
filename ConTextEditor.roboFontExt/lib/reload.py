@@ -5,3 +5,6 @@ importlib.reload(context)
 
 import contextSettings
 importlib.reload(contextSettings)
+
+import contextInstanceCollector
+importlib.reload(contextInstanceCollector)

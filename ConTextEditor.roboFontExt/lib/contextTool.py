@@ -7,6 +7,10 @@ from mojo.UI import CurrentGlyphWindow
 from mojo.extensions import ExtensionBundle
 from lib.UI.toolbarGlyphTools import ToolbarGlyphTools
 
+
+from contextInstanceCollector import ContextInstanceCollector, contextAllInstances
+import builtins
+
 # from AppKit import NSImage, NSImageNameAdvanced, NSImageNameFontPanel
 
 # ----------------------------------------
@@ -90,11 +94,10 @@ class AddToolbarToggleButton(Subscriber):
     def edit_callback(self, sender):
         setActiveEventTool("ContextEditTool")
 
-
-
 # ----------------------------------------
 
 installTool(ContextEditTool())
 registerRoboFontSubscriber(AddToolbarToggleButton)
-register_custom_event()
+registerRoboFontSubscriber(ContextInstanceCollector)    
+builtins.ContextAllInstances = contextAllInstances
 

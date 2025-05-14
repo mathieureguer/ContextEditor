@@ -1,3 +1,5 @@
+from fontTools.designspaceLib import InstanceDescriptor
+
 from mojo.subscriber import *
 from mojo.UI import CurrentGlyphWindow, inDarkMode, getDefault
 from mojo.roboFont import CurrentGlyph, CurrentFont, AllFonts, RGlyph
@@ -8,6 +10,8 @@ import vanilla
 import pathlib
 
 from EzuiExtentionSettingsManager import ExtentionSettingsManager
+from contextInstanceCollector import ContextInstance
+
 
 # ----------------------------------------
 
@@ -29,9 +33,12 @@ DEFAULTS = {
 
 DEFAULT_KEY = "com.mathieureguer.ConTextEditor."
 
+INSTANCE_DESCRIPTOR_ATTRIBUTE = "_instance_descriptor"
+
 # ----------------------------------------
 
 def _get_font_string(font):
+    instance = False
     if font == None:
         return CURRENT_FONT_MENU_NAME
     else:
@@ -373,7 +380,7 @@ class ContextGlyph(BaseContextEditorBox):
     def _set_font(self, value):
         if isinstance(value, str):
             self._font = None
-            for f in AllFonts():
+            for f in AllFonts() + ContextAllInstances():
                 if _get_font_string(f) == value:
                     self._font = f
                     break
@@ -382,17 +389,24 @@ class ContextGlyph(BaseContextEditorBox):
 
     @property
     def glyph(self):
-        font = self.font or self.current_font
-        
+        if self.font == None:
+            font = self.current_font
+        else:
+            font = self.font
         name = self.name
         target_layer = self.target_layer
-        if len(name) > 0 and name in font:
+
+        if isinstance(font, ContextInstance):
+            glyph = font.get_glyph(name)
+
+        if name in font.keys():
             glyph = font[name]
             if target_layer in font.layerOrder:
                 glyph = glyph.getLayer(target_layer)
         else:
             glyph = RGlyph()
             glyph.width = 200
+
         return glyph
     
     # ----------------------------------------
@@ -533,7 +547,13 @@ class ContextGlyph(BaseContextEditorBox):
         # maybe this should always update everything?
         # layer can change...
         # self._update_glyph_path()
+        print("glyph changed")
         if self.name == self.current_glyph.name:
+            if isinstance(self.glyph.font, ContextInstance):
+                print("updating instance")
+                instance = self.glyph.font
+                instance.designspace.glyphChanged(self.name)
+                g = instance.mutate_glyph(self.name)
             if self.target_layer == self.current_glyph.layer.name:
             # Glyph will get redrawn even if they are not on the same layer
                 self._update_glyph_path()
@@ -642,7 +662,7 @@ class ContextGlyphPopover():
     
     def _update_font_dict(self):
         self.font_map = {CURRENT_FONT_MENU_NAME: None} 
-        for f in AllFonts():
+        for f in AllFonts() + ContextAllInstances():
             self.font_map[_get_font_string(f)] = f
 
     def _udpate_font_popup(self):
@@ -881,9 +901,13 @@ class ContextDisplaySubscriber(Subscriber):
         self.position_context()
         self.colorize_context()
 
+ 
+
     def destroy(self):
         self.save_context_to_font_lib()
         self.clear_context()
+
+
 
     # ----------------------------------------
     ## this is used for persistent context shared accross all subscribers
@@ -1186,4 +1210,4 @@ class ContextDisplaySubscriber(Subscriber):
         box = MaskContextGlyph(parent=self, **glyph_data)
         self.mask_context = [box]
         return box
-        
+
