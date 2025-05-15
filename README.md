@@ -16,13 +16,21 @@ A background / mask neighbors is available, for overlay under the current glyph.
 Any open ufo can be used as neighbor provider.
 ![preview](https://github.com/mathieureguer/ContextEditor/blob/main/resources/screens/preview.png)
 
+Instances from DesignSpaces open via the great DesignSpaceEditor can used as neighbor provider as well. Interpolation is live and will update with your edits. 
+
+![designspace](https://github.com/mathieureguer/ContextEditor/blob/main/resources/screens/designspace.gif)
+
 
 ## tokens
 
-A few special token are available when setting up neighbors:
+A few dynamic tokens are available when setting up neighbors:
 
 - `<self>` will be replaced by the current glyph name. 
+  ![<self>](https://github.com/mathieureguer/ContextEditor/blob/main/resources/screens/self.gif)
+
 - `<root>` will be replaced by the current glyph name, without suffix.
+  ![<root>](https://github.com/mathieureguer/ContextEditor/blob/main/resources/screens/root.png)
+
 - `@layerName` will fetch said layer from the requested glyph.
 
 
@@ -30,5 +38,5 @@ A few special token are available when setting up neighbors:
 
 `<root>` will display `A` when current glyph is `À.smcp`
 
-`<root>.alt@background` will display the `background` layer from `È.alt` when current glyph is `È.ss02`
+`<root>.alt@background` will display the `background` layer from `E.alt` when current glyph is `E.ss02`
 
