@@ -26,9 +26,11 @@ Instances from DesignSpaces open via the great DesignSpaceEditor can used as nei
 A few dynamic tokens are available when setting up neighbors:
 
 - `<self>` will be replaced by the current glyph name. 
+    
   ![<self>](https://github.com/mathieureguer/ContextEditor/blob/main/resources/screens/self.gif)
 
 - `<root>` will be replaced by the current glyph name, without suffix.
+
   ![<root>](https://github.com/mathieureguer/ContextEditor/blob/main/resources/screens/root.png)
 
 - `@layerName` will fetch said layer from the requested glyph.
