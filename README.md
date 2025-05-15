@@ -3,7 +3,7 @@
 ConTextEditor is a Robofont extention that display neighbor glyphs in your glyph editor, much like the great RamsayStreet — with aditional flexibility. 
 
 Neighbors are not fetched from a preexisting database, instead the focus is set on setting them on the fly.
-![UI](https://github.com/mathieureguer/ContextEditor/blob/main/resources/screens/UI.png)
+![UI](https://github.com/mathieureguer/ContextEditor/blob/main/resources/screens/UI-annotated.png)
 
 
 Multiple neighbors can be displayed at once.
@@ -26,7 +26,7 @@ Instances from DesignSpaces open via the great DesignSpaceEditor can used as nei
 A few dynamic tokens are available when setting up neighbors:
 
 - `<self>` will be replaced by the current glyph name. 
-    
+
   ![<self>](https://github.com/mathieureguer/ContextEditor/blob/main/resources/screens/self.gif)
 
 - `<root>` will be replaced by the current glyph name, without suffix.
